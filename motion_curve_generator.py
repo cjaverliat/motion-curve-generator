@@ -7,6 +7,7 @@ bl_info = {
     "category": "Animation",
 }
 
+THRESHOLD_ORIGIN = 0.01  # Ignore points very close to origin
 
 def compute_cumulative_length(points):
     total_length = 0
@@ -92,7 +93,6 @@ class OBJECT_OT_motion_to_curve(bpy.types.Operator):
             )
             bpy.ops.pose.paths_clear(only_selected=True)
         else:
-            # Mesh case: compute vertex center per frame
             depsgraph = context.evaluated_depsgraph_get()
             frames = range(context.scene.frame_start, context.scene.frame_end + 1)
             points = []
@@ -102,7 +102,12 @@ class OBJECT_OT_motion_to_curve(bpy.types.Operator):
                 eval_obj = obj.evaluated_get(depsgraph)
                 mesh = eval_obj.to_mesh()
                 avg_co = sum((v.co for v in mesh.vertices), Vector()) / len(mesh.vertices)
-                points.append(eval_obj.matrix_world @ avg_co)
+                world_co = eval_obj.matrix_world @ avg_co
+
+                # Filter out points close to origin
+                if (world_co - Vector((0, 0, 0))).length >= THRESHOLD_ORIGIN:
+                    points.append(world_co)
+                
                 eval_obj.to_mesh_clear()
 
             create_curve_from_points(points, f"{obj.name}_trail")
